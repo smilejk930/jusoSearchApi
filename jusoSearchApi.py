@@ -1,7 +1,7 @@
 """도로명주소 API 조회 결과에 성공 여부를 포함해 CSV로 출력한다.
 
 사용 예시:
-    python jusoSearchApi.py --input addresses.csv --output result.csv
+    python jusoSearchApi.py --input addresses.csv
 
 승인키는 스크립트와 같은 폴더의 ``.env`` 파일에 아래처럼 설정한다.
     JUSO_API_KEY=발급받은_승인키
@@ -18,6 +18,7 @@ import logging
 import os
 import re
 import time
+from datetime import datetime
 from pathlib import Path
 
 import requests
@@ -197,10 +198,20 @@ def read_addresses(input_path: Path):
         yield row[0].strip(), row[1].strip()
 
 
+def default_output_path(now: datetime | None = None) -> Path:
+    """현재 시각을 포함한 기본 결과 파일 경로를 반환한다."""
+    timestamp = (now or datetime.now()).strftime("%Y%m%d%H%M")
+    return Path(f"result_{timestamp}.csv")
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", required=True, type=Path, help="pk,addrnm 형식 CSV")
-    parser.add_argument("--output", type=Path, help="결과 CSV 경로 (없으면 화면 출력)")
+    parser.add_argument(
+        "--output",
+        type=Path,
+        help="결과 CSV 경로 (미지정 시 result_YYYYMMDDHHMM.csv 자동 생성)",
+    )
     parser.add_argument(
         "--api-key",
         help="도로명주소 검색 API 승인키 (미지정 시 환경변수 또는 .env 사용)",
@@ -218,6 +229,7 @@ def main():
         help="로그 상세 수준 (기본값: INFO)",
     )
     args = parser.parse_args()
+    output_path = args.output or default_output_path()
 
     logging.basicConfig(
         level=getattr(logging, args.log_level),
@@ -226,7 +238,7 @@ def main():
     )
 
     started_at = time.monotonic()
-    logger.info("작업 시작: 입력=%s, 출력=%s", args.input, args.output or "표준출력")
+    logger.info("작업 시작: 입력=%s, 출력=%s", args.input, output_path)
 
     try:
         addresses = list(read_addresses(args.input))
@@ -243,11 +255,11 @@ def main():
     if args.request_interval < 0:
         parser.error("--request-interval은 0 이상이어야 합니다.")
 
-    output = args.output.open("w", encoding="utf-8-sig", newline="") if args.output else None
+    output = output_path.open("w", encoding="utf-8-sig", newline="")
     session = requests.Session()
     cache = {}
     try:
-        writer = csv.DictWriter(output or __import__("sys").stdout, fieldnames=OUTPUT_FIELDS)
+        writer = csv.DictWriter(output, fieldnames=OUTPUT_FIELDS)
         writer.writeheader()
         for index, (pk, address) in enumerate(addresses, start=1):
             item_started_at = time.monotonic()
@@ -263,8 +275,7 @@ def main():
                     time.sleep(args.request_interval)
             result = {"pk": pk, "addrnm": address, **lookup_result}
             writer.writerow(result)
-            if output:
-                output.flush()
+            output.flush()
             logger.info(
                 "[%d/%d] 조회 완료: pk=%s, 상태=%s, 소요=%.2f초",
                 index,
@@ -275,14 +286,13 @@ def main():
             )
     finally:
         session.close()
-        if output:
-            output.close()
+        output.close()
 
     logger.info(
         "작업 완료: 전체=%d건, 총 소요=%.2f초, 출력=%s",
         total,
         time.monotonic() - started_at,
-        args.output or "표준출력",
+        output_path,
     )
 
 

@@ -3,6 +3,11 @@
 .env.*
 !.env.example
 
+# Local input and generated output data
+addresses.csv
+result.csv
+result_*.csv
+
 # Python
 __pycache__/
 *.py[cod]
