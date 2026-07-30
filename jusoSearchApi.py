@@ -18,7 +18,6 @@ import logging
 import os
 import re
 import time
-from datetime import datetime
 from pathlib import Path
 
 import requests
@@ -198,19 +197,13 @@ def read_addresses(input_path: Path):
         yield row[0].strip(), row[1].strip()
 
 
-def default_output_path(now: datetime | None = None) -> Path:
-    """현재 시각을 포함한 기본 결과 파일 경로를 반환한다."""
-    timestamp = (now or datetime.now()).strftime("%Y%m%d%H%M")
-    return Path(f"result_{timestamp}.csv")
-
-
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", required=True, type=Path, help="pk,addrnm 형식 CSV")
     parser.add_argument(
         "--output",
         type=Path,
-        help="결과 CSV 경로 (미지정 시 result_YYYYMMDDHHMM.csv 자동 생성)",
+        help="불일치 결과 CSV 경로 (미지정 시 result.csv)",
     )
     parser.add_argument(
         "--api-key",
@@ -229,7 +222,7 @@ def main():
         help="로그 상세 수준 (기본값: INFO)",
     )
     args = parser.parse_args()
-    output_path = args.output or default_output_path()
+    output_path = args.output or Path("result.csv")
 
     logging.basicConfig(
         level=getattr(logging, args.log_level),
@@ -258,6 +251,7 @@ def main():
     output = output_path.open("w", encoding="utf-8-sig", newline="")
     session = requests.Session()
     cache = {}
+    mismatch_count = 0
     try:
         writer = csv.DictWriter(output, fieldnames=OUTPUT_FIELDS)
         writer.writeheader()
@@ -274,8 +268,10 @@ def main():
                 if args.request_interval and index < total:
                     time.sleep(args.request_interval)
             result = {"pk": pk, "addrnm": address, **lookup_result}
-            writer.writerow(result)
-            output.flush()
+            if not result["정확일치"]:
+                writer.writerow(result)
+                output.flush()
+                mismatch_count += 1
             logger.info(
                 "[%d/%d] 조회 완료: pk=%s, 상태=%s, 소요=%.2f초",
                 index,
@@ -289,8 +285,9 @@ def main():
         output.close()
 
     logger.info(
-        "작업 완료: 전체=%d건, 총 소요=%.2f초, 출력=%s",
+        "작업 완료: 전체=%d건, 불일치=%d건, 총 소요=%.2f초, 출력=%s",
         total,
+        mismatch_count,
         time.monotonic() - started_at,
         output_path,
     )
