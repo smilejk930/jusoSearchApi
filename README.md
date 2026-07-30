@@ -86,15 +86,20 @@ pk,addrnm
 
 ## 실행
 
-입력 주소와 API 반환 도로명주소가 정확히 일치하지 않는 결과만 `result.csv`에
-저장됩니다. 정확히 일치한 주소는 결과 파일에 기록되지 않습니다.
+조회한 모든 주소의 결과가 실행 시각을 포함한 CSV 파일에 저장됩니다.
 
 ```bash
 python jusoSearchApi.py --input addresses.csv
 ```
 
-`result.csv`에는 유사결과, 검색결과 없음, API 오류 등 확인이 필요한 행만
-남습니다. 결과 파일은 Git에 포함되지 않습니다. 파일명을 직접 지정하려면
+예를 들어 2026년 7월 30일 10시 1분에 실행하면 다음 파일이 생성됩니다.
+
+```text
+result_202607301001.csv
+```
+
+결과 파일에는 정확일치, 유사결과, 검색결과 없음, API 오류 등 모든 조회 결과가
+기록됩니다. 결과 파일은 Git에 포함되지 않습니다. 파일명을 직접 지정하려면
 `--output`을 사용합니다.
 
 ```bash
@@ -111,7 +116,7 @@ python jusoSearchApi.py --input addresses.csv --api-key "승인키"
 
 ```text
 --input              입력 CSV 경로 (필수)
---output             불일치 결과 CSV 경로 (생략 시 result.csv)
+--output             결과 CSV 경로 (생략 시 result_YYYYMMDDHHMM.csv 자동 생성)
 --api-key            이번 실행에서 사용할 API 승인키
 --request-interval   서로 다른 주소 조회 사이의 대기 시간(초, 기본값 0.1)
 --log-level          DEBUG, INFO, WARNING, ERROR 중 선택
